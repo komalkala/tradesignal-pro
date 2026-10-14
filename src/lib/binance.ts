@@ -1,34 +1,27 @@
 
 import type { Candle, Interval, SymbolId } from "./types";
 
-const BASE = "https://api.bybit.com";
+const BASE = "https://www.okx.com";
+
+const SYMBOLS: Record<SymbolId, string> = {
+  BTCUSDT: "BTC-USDT-SWAP",
+  ETHUSDT: "ETH-USDT-SWAP",
+  SOLUSDT: "SOL-USDT-SWAP",
+};
 
 const INTERVALS: Record<string, string> = {
-  "5m": "5",
-  "15m": "15",
-  "1h": "60",
-  "4h": "240",
-  "1d": "D",
-  "1w": "W",
+  "5m": "5m",
+  "15m": "15m",
+  "1h": "1H",
+  "4h": "4H",
+  "1d": "1Dutc",
+  "1w": "1Wutc",
 };
 
-const DURATION_MS: Record<string, number> = {
-  "5m": 5 * 60_000,
-  "15m": 15 * 60_000,
-  "1h": 60 * 60_000,
-  "4h": 4 * 60 * 60_000,
-  "1d": 24 * 60 * 60_000,
-  "1w": 7 * 24 * 60 * 60_000,
-};
-
-type BybitKlineResponse = {
-  retCode: number;
-  retMsg: string;
-  result?: {
-    category: string;
-    symbol: string;
-    list: string[][];
-  };
+type OKXResponse = {
+  code: string;
+  msg: string;
+  data: string[][];
 };
 
 export async function getCandles(
@@ -36,94 +29,88 @@ export async function getCandles(
   interval: Interval | "1w",
   limit = 700
 ): Promise<Candle[]> {
-  const providerInterval = INTERVALS[interval];
-  const duration = DURATION_MS[interval];
+  const instId = SYMBOLS[symbol];
+  const bar = INTERVALS[interval];
 
-  if (!providerInterval || !duration) {
-    throw new Error(`Unsupported interval: ${interval}`);
+  if (!instId || !bar) {
+    throw new Error("Unsupported symbol or interval");
   }
 
-  const count = Math.min(1000, Math.max(250, limit));
+  const requested = Math.max(250, Math.min(1500, limit));
+  const candles: Candle[] = [];
+  let after: string | undefined;
 
-  const url = new URL("/v5/market/kline", BASE);
-  url.searchParams.set("category", "linear");
-  url.searchParams.set("symbol", symbol);
-  url.searchParams.set("interval", providerInterval);
-  url.searchParams.set("limit", String(count));
+  while (candles.length < requested) {
+    const url = new URL("/api/v5/market/history-candles", BASE);
 
-  const response = await fetch(url, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(12000),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Bybit market data HTTP ${response.status}`
+    url.searchParams.set("instId", instId);
+    url.searchParams.set("bar", bar);
+    url.searchParams.set(
+      "limit",
+      String(Math.min(100, requested - candles.length + 1))
     );
-  }
 
-  const raw: BybitKlineResponse = await response.json();
+    if (after) {
+      url.searchParams.set("after", after);
+    }
 
-  if (
-    raw.retCode !== 0 ||
-    !Array.isArray(raw.result?.list)
-  ) {
-    throw new Error(
-      `Bybit response error: ${raw.retMsg || raw.retCode}`
-    );
-  }
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
 
-  const now = Date.now();
+    if (!response.ok) {
+      throw new Error(`OKX HTTP ${response.status}`);
+    }
 
-  const candles: Candle[] = raw.result.list
-    .map((row): Candle => {
-      if (!Array.isArray(row) || row.length < 6) {
-        throw new Error("Invalid Bybit candle");
-      }
+    const raw: OKXResponse = await response.json();
 
-      return {
+    if (raw.code !== "0" || !Array.isArray(raw.data)) {
+      throw new Error(`OKX API error: ${raw.msg}`);
+    }
+
+    if (raw.data.length === 0) break;
+
+    for (const row of raw.data) {
+      if (row.length < 9 || row[8] !== "1") continue;
+
+      const candle: Candle = {
         time: Number(row[0]),
         open: Number(row[1]),
         high: Number(row[2]),
         low: Number(row[3]),
         close: Number(row[4]),
-        volume: Number(row[5]),
+        volume: Number(row[6]),
       };
-    })
-    .filter((c) => c.time + duration <= now)
-    .sort((a, b) => a.time - b.time);
 
-  if (candles.length < 210) {
+      if (
+        [
+          candle.time,
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volume,
+        ].every(Number.isFinite)
+      ) {
+        candles.push(candle);
+      }
+    }
+
+    after = raw.data[raw.data.length - 1][0];
+
+    if (raw.data.length < 2) break;
+  }
+
+  const unique = Array.from(
+    new Map(candles.map((c) => [c.time, c])).values()
+  ).sort((a, b) => a.time - b.time);
+
+  if (unique.length < 210) {
     throw new Error(
-      `Insufficient completed candles: ${candles.length}`
+      `Not enough completed OKX candles: ${unique.length}`
     );
   }
 
-  for (let i = 0; i < candles.length; i++) {
-    const c = candles[i];
-
-    if (
-      ![
-        c.time,
-        c.open,
-        c.high,
-        c.low,
-        c.close,
-        c.volume,
-      ].every(Number.isFinite) ||
-      c.open <= 0 ||
-      c.high < Math.max(c.open, c.close, c.low) ||
-      c.low > Math.min(c.open, c.close) ||
-      c.low <= 0 ||
-      c.volume < 0
-    ) {
-      throw new Error("Invalid OHLCV values");
-    }
-
-    if (i > 0 && c.time <= candles[i - 1].time) {
-      throw new Error("Duplicate or unordered candles");
-    }
-  }
-
-  return candles;
+  return unique.slice(-requested);
 }
