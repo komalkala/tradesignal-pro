@@ -1,0 +1,11 @@
+export const SYMBOLS = ["SOLUSDT", "BTCUSDT", "ETHUSDT"] as const;
+export const INTERVALS = ["5m", "15m", "1h", "4h", "1d"] as const;
+export type SymbolId = (typeof SYMBOLS)[number];
+export type Interval = (typeof INTERVALS)[number];
+export type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
+export type Side = "LONG" | "SHORT";
+export type Decision = Side | "WAIT";
+export type Indicators = { ema20: number; ema50: number; ema200: number; rsi: number; macd: number; macdSignal: number; macdHistogram: number; atr: number; volumeRatio: number };
+export type Signal = { decision: Decision; reasons: string[]; indicators: Indicators; entry: number | null; stop: number | null; target: number | null; riskDistance: number | null; candleTime: number; score: number };
+export type StrategySettings = { atrMultiple: number; rewardRatio: number; feeRate: number; slippageRate: number; riskPercent: number; accountSize: number };
+export const DEFAULT_SETTINGS: StrategySettings = { atrMultiple: 1.5, rewardRatio: 2, feeRate: 0.0005, slippageRate: 0.0002, riskPercent: 1, accountSize: 1000 };

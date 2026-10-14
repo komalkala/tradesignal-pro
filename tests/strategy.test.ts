@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {ema,rsi,atr,indicatorSeries} from '../src/lib/indicators';import {generateSignal,positionSizing} from '../src/lib/strategy';import {DEFAULT_SETTINGS,type Candle} from '../src/lib/types';import {backtest} from '../src/lib/backtest';
+test('EMA seed is simple moving average and constant sequence remains constant',()=>{const a=ema([1,2,3,4,5],3);assert.equal(a[2],2);assert.equal(a[3],3);assert.equal(a[4],4)});
+test('RSI is 50 for unchanged prices',()=>{assert.equal(rsi(Array(30).fill(100))[29],50)});
+test('ATR matches constant range',()=>{const c=Array.from({length:20},(_,i)=>({time:i,open:100,high:101,low:99,close:100,volume:10}));assert.equal(atr(c)[19],2)});
+test('position size risks 1 percent before execution costs',()=>{const s=positionSizing(100,98,DEFAULT_SETTINGS);assert.equal(s?.quantity,5);assert.equal(s?.riskUsd,10)});
+test('indicator series and backtester do not crash on flat history',()=>{const c:Candle[]=Array.from({length:300},(_,i)=>({time:i*3600000,open:100,high:101,low:99,close:100,volume:100}));const ind=indicatorSeries(c);assert.equal(generateSignal(c.at(-1)!,ind.at(-1)!,DEFAULT_SETTINGS).decision,'WAIT');const result=backtest(c,DEFAULT_SETTINGS);assert.equal(result.trades.length,0);assert.equal(result.endingEquity,1000)});
