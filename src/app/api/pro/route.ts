@@ -7,7 +7,11 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(req:NextRequest){
  const p=parseMarketParams(req.nextUrl.searchParams);if('error'in p)return NextResponse.json(p,{status:400});
  try{
-  const higher:Interval=p.interval==='15m'?'1h':p.interval==='1h'?'4h':p.interval==='4h'?'1d':'1w';
+const higher: Interval =
+  p.interval === "5m" ? "15m" :
+  p.interval === "15m" ? "1h" :
+  p.interval === "1h" ? "4h" :
+  "1d";
   const [candles,higherCandles,btcCandles,snapshot]=await Promise.all([
    getCandles(p.symbol,p.interval,700),getCandles(p.symbol,higher,300),getCandles('BTCUSDT',higher,300),futuresSnapshot(p.symbol)]);
   const signal=qualitySignal({candles,higher:profile(higherCandles),btc:profile(btcCandles),symbol:p.symbol,snapshot});
