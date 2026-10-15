@@ -1,8 +1,9 @@
+import {SYMBOLS as AVAILABLE_SYMBOLS} from '@/lib/types';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const SYMBOLS = new Set(['BTCUSDT','ETHUSDT','SOLUSDT']);
+const SYMBOLS = new Set<string>(AVAILABLE_SYMBOLS);
 const INTERVALS = new Set(['1d','1h','5m']);
 const INTERVAL_MS: Record<string,number> = {'1d':86_400_000,'1h':3_600_000,'5m':300_000};
 const FOUR_YEARS_MS = 4 * 366 * 86_400_000;

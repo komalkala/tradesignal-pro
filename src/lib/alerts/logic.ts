@@ -3,6 +3,7 @@ import type { Quality } from '../pro';
 
 export const WATCH_INTERVALS = ['15m', '1h', '4h', '1d'] as const satisfies readonly Interval[];
 export const WATCH_SYMBOLS = ['SOLUSDT', 'BTCUSDT', 'ETHUSDT'] as const satisfies readonly SymbolId[];
+export const ADDITIONAL_SYMBOLS = ['TAOUSDT', 'LINKUSDT', 'BNBUSDT'] as const satisfies readonly SymbolId[];
 export const INTERVAL_MS: Record<Interval | '1w', number> = {
   '5m': 300_000,
   '15m': 900_000,

@@ -3,7 +3,7 @@ import {Fragment,useCallback,useEffect,useMemo,useState} from 'react';
 import Link from 'next/link';
 import {ArrowLeft,ChevronDown,ChevronUp,Download,RefreshCw} from 'lucide-react';
 
-type SymbolId='BTCUSDT'|'SOLUSDT'|'ETHUSDT';
+import {SYMBOLS, type SymbolId} from '@/lib/types';
 type Interval='1d'|'1h'|'5m';
 type Bar={time:number;open:number;high:number;low:number;close:number;volume:number;quoteVolume:number;trades:number};
 const DAY=86_400_000;
@@ -68,7 +68,7 @@ export default function HistoricalMovementTable(){
  return <main className="mx-auto max-w-[1460px] px-4 sm:px-6 py-7 sm:py-9 text-[13px]">
   <div className="flex flex-wrap items-center justify-between gap-3 mb-6"><div><Link className="inline-flex items-center gap-2 text-[#9ecbc8] mb-3 hover:underline" href="/"><ArrowLeft size={14}/> Back to trading dashboard</Link><h1 className="text-xl font-medium">Historical Market Movement</h1><p className="muted mt-1">BTC · SOL · ETH | Binance USDT Futures | UTC daily candles | Table only</p></div><button type="button" className="rounded-md border border-[#365165] px-3 py-2 flex gap-2 items-center" onClick={exportDaily} disabled={!filtered.length}><Download size={15}/> Export CSV</button></div>
   <section className="panel p-4 sm:p-5 mb-4"><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-   <label className="block"><span className="muted block mb-1">Coin</span><select className="w-full rounded-md bg-[#203246] border border-[#385065] p-2.5" value={symbol} onChange={e=>setSymbol(e.target.value as SymbolId)}><option value="SOLUSDT">SOL / USDT</option><option value="BTCUSDT">BTC / USDT</option><option value="ETHUSDT">ETH / USDT</option></select></label>
+   <label className="block"><span className="muted block mb-1">Coin</span><select className="w-full rounded-md bg-[#203246] border border-[#385065] p-2.5" value={symbol} onChange={e=>setSymbol(e.target.value as SymbolId)}>{SYMBOLS.map(s=><option value={s} key={s}>{s.replace('USDT','')} / USDT</option>)}</select></label>
    <label className="block"><span className="muted block mb-1">From (UTC)</span><input type="date" className="w-full rounded-md bg-[#203246] border border-[#385065] p-2.5" value={start} max={end} onChange={e=>setStart(e.target.value)}/></label>
    <label className="block"><span className="muted block mb-1">To (UTC)</span><input type="date" className="w-full rounded-md bg-[#203246] border border-[#385065] p-2.5" value={end} min={start} max={toDate(Date.now())} onChange={e=>setEnd(e.target.value)}/></label>
    <label className="block"><span className="muted block mb-1">Direction</span><select className="w-full rounded-md bg-[#203246] border border-[#385065] p-2.5" value={direction} onChange={e=>{setDirection(e.target.value);setPage(1);}}><option value="all">All days</option><option value="up">Bullish</option><option value="down">Bearish</option><option value="volatile">Range ≥ 5%</option></select></label>

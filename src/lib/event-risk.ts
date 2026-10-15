@@ -1,4 +1,4 @@
-export type RiskEvent = { id:string; title:string; category:'FOMC'|'CPI'|'UPGRADE'|'UNLOCK'|'OTHER'; dateUTC:string; source:string; impact:'HIGH'|'MEDIUM'; scope:'ALL'|'BTC'|'ETH'|'SOL'; verified:boolean; };
+export type RiskEvent = { id:string; title:string; category:'FOMC'|'CPI'|'UPGRADE'|'UNLOCK'|'OTHER'; dateUTC:string; source:string; impact:'HIGH'|'MEDIUM'; scope:'ALL'|'BTC'|'ETH'|'SOL'|'TAO'|'LINK'|'BNB'; verified:boolean; };
 /** Date-only events are calendar-day warnings, NOT claims about an exact release time. */
 export const EVENTS: RiskEvent[] = [
   {id:'fomc-oct-2026',title:'FOMC scheduled meeting concludes (decision time not verified)',category:'FOMC',dateUTC:'2026-10-28',source:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',impact:'HIGH',scope:'ALL',verified:true},
@@ -11,7 +11,7 @@ export const EVENT_SOURCES = [
  {name:'ETF flow data',url:'https://www.sosovalue.com/assets/etf',note:'Provider data integration and licensing required before automated alerts'},
 ];
 export function utcDay(ms:number){return new Date(ms).toISOString().slice(0,10);}
-export function riskContext(now=Date.now(),coin?:'BTC'|'ETH'|'SOL') {
+export function riskContext(now=Date.now(),coin?:'BTC'|'ETH'|'SOL'|'TAO'|'LINK'|'BNB') {
   const today=utcDay(now), weekday=new Date(now).getUTCDay();
   const upcoming=EVENTS.filter(e=>(e.scope==='ALL'||!coin||e.scope===coin)&&e.dateUTC>=today)
    .map(e=>({...e,daysUntil:Math.round((Date.parse(e.dateUTC+'T00:00:00Z')-Date.parse(today+'T00:00:00Z'))/86400000)}))

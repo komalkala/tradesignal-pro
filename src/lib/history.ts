@@ -1,4 +1,4 @@
-import type { Candle } from './types';
+import {SYMBOLS, type Candle, type SymbolId} from './types';
 
 export type HistoryInterval = '5m'|'15m'|'1h'|'4h'|'1d'|'1w';
 export const INTERVAL_MS: Record<HistoryInterval, number> = {
@@ -20,10 +20,10 @@ export function validateHistory(candles:Candle[], interval:HistoryInterval):{val
 
 /** Multiple REST pages, oldest-first, deduplicated, no active candles. No API keys. */
 export async function loadHistoricalCandles(
-  symbol:'SOLUSDT'|'BTCUSDT'|'ETHUSDT',interval:HistoryInterval,
+  symbol:SymbolId,interval:HistoryInterval,
   requested=5000, fetcher:typeof fetch=fetch
 ):Promise<Candle[]>{
-  if(!['SOLUSDT','BTCUSDT','ETHUSDT'].includes(symbol)||!Object.hasOwn(INTERVAL_MS,interval))throw Error('Unsupported market');
+  if(!SYMBOLS.some(s=>s===symbol)||!Object.hasOwn(INTERVAL_MS,interval))throw Error('Unsupported market');
   const max=Math.min(10000,Math.max(250,Math.floor(requested)));
   const pages:Candle[]=[]; let endTime:number|undefined;
   for(let page=0;pages.length<max&&page<10;page++){

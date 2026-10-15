@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {detectRegime} from '../src/lib/market-regime';
+import {researchEntry} from '../src/lib/entry-confirmation';
+import {performanceMetrics} from '../src/lib/performance-metrics';
+import {chronologicalValidation} from '../src/lib/walk-forward';
+import type {Candle} from '../src/lib/types';
+const bars:Candle[]=Array.from({length:80},(_,i)=>({time:i*300000,open:100+i,high:101+i,low:99+i,close:100+i,volume:10}));
+test('regime uses completed input only and detects directional trend',()=>assert.equal(detectRegime(bars).regime,'UPTREND'));
+test('breakout cannot use future candle',()=>{const breakout=[...bars.slice(0,-1),{...bars.at(-1)!,close:181,high:182}];const result=researchEntry(breakout,'LONG');assert.equal(result[0].confirmed,true);assert.equal(result[0].signalTime,bars.at(-1)!.time)});
+test('profit and drawdown metrics reflect losses',()=>{const p=performanceMetrics([{pnl:4,entryTime:0,exitTime:300000},{pnl:-6,entryTime:300000,exitTime:600000}],100);assert.equal(p.netPnl,-2);assert.ok(p.maxDrawdownPct>0)});
+test('chronological windows do not invent trades',()=>{const x=chronologicalValidation([],0,86400000,4);assert.equal(x.windows.length,4);assert.equal(x.adequateEvidence,false)});

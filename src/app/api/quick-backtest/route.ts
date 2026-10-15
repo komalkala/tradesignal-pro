@@ -2,11 +2,11 @@ import {NextRequest,NextResponse} from 'next/server';
 import {loadHistoricalCandles} from '@/lib/history';
 import {runQuickBacktest} from '@/lib/quick-backtest';
 import {analyzeOutOfSample} from '@/lib/research';
-import type {SymbolId} from '@/lib/types';
+import {SYMBOLS, type SymbolId} from '@/lib/types';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(req:NextRequest){
  const symbol=req.nextUrl.searchParams.get('symbol')??'SOLUSDT';
- if(!['SOLUSDT','BTCUSDT','ETHUSDT'].includes(symbol))return NextResponse.json({error:'Invalid symbol'},{status:400});
+ if(!SYMBOLS.some(s=>s===symbol))return NextResponse.json({error:'Invalid symbol'},{status:400});
  const bars=Number(req.nextUrl.searchParams.get('bars')??5000);
  const maxMinutes=Number(req.nextUrl.searchParams.get('maxMinutes')??60);
  if(!Number.isInteger(bars)||bars<1000||bars>10000||![15,30,45,60].includes(maxMinutes))return NextResponse.json({error:'bars: 1000–10000; maxMinutes: 15,30,45,60'},{status:400});

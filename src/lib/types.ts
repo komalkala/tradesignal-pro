@@ -1,4 +1,4 @@
-export const SYMBOLS = ["SOLUSDT", "BTCUSDT", "ETHUSDT"] as const;
+export const SYMBOLS = ["SOLUSDT", "BTCUSDT", "ETHUSDT", "TAOUSDT", "LINKUSDT", "BNBUSDT"] as const;
 export const INTERVALS = ["5m", "15m", "1h", "4h", "1d"] as const;
 export type SymbolId = (typeof SYMBOLS)[number];
 export type Interval = (typeof INTERVALS)[number];

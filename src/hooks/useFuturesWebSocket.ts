@@ -3,8 +3,9 @@
 
 import { useEffect, useState } from "react";
 
-type Symbol = "SOLUSDT" | "BTCUSDT" | "ETHUSDT";
-type Interval = "15m" | "1h" | "4h" | "1d" | "1w";
+import type {SymbolId} from "@/lib/types";
+type Symbol = SymbolId;
+type Interval = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
 type Candle = {
   time: number;
@@ -55,7 +56,7 @@ export function useFuturesWebSocket(
           if (!k) return;
 
           const next: Candle = {
-            time: Math.floor(k.t / 1000),
+            time: Number(k.t), // Keep milliseconds, consistent with REST candles
             open: Number(k.o),
             high: Number(k.h),
             low: Number(k.l),

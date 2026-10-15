@@ -10,7 +10,7 @@ type DiagnosticsData = {
   signal: Quality;
   higher: Profile;
   btc: Profile;
-  higherInterval: Interval;
+  higherInterval: Interval | "1w";
   updatedAt: string;
 };
 
@@ -45,7 +45,7 @@ export default function SignalDiagnostics({data,loading,error,stale,candleCloseT
   const nextClose=candleCloseTime===null?null:candleCloseTime+INTERVAL_MS[interval];
   return <section className="panel mt-4 p-4 sm:p-5" aria-label="Signal engine diagnostics">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2"><Activity size={17} className="text-teal-300"/><div><h2 className="text-sm font-semibold">Signal engine health</h2><p className="muted text-xs">Why the strategy is waiting · completed candles only</p></div></div>
+      <div className="flex items-center gap-2"><Activity size={17} className="text-teal-300"/><div><h2 className="text-sm font-semibold">Signal engine health</h2><p className="muted text-xs">Completed-candle strategy · evaluates LONG and SHORT independently</p></div></div>
       <span className={`rounded-md border px-3 py-1 text-xs ${dataHealthy&&indicatorsHealthy&&!riskBlocked&&!error?'border-teal-600/60 text-teal-200':'border-amber-600/60 text-amber-200'}`}>{status}</span>
     </div>
     <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -58,7 +58,7 @@ export default function SignalDiagnostics({data,loading,error,stale,candleCloseT
     </div>
     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs text-[#aebfcb]"><span><Clock3 size={13} className="mr-1 inline"/>Last completed candle: {candleCloseTime?pretty(candleCloseTime):"—"}</span><span>Next expected close: {nextClose?pretty(nextClose):"—"}</span><span>Last API fetch: {Number.isFinite(fetchedAt)?pretty(fetchedAt):"—"}</span></div>
     <div className="mt-3 rounded-md border border-[#345060] bg-[#142332] p-3">
-      <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold">Why {signal?.decision??"signal"}?</p><button type="button" className="flex items-center gap-1 text-xs text-teal-200" aria-expanded={expanded} onClick={()=>setExpanded(x=>!x)}>{expanded?'Hide':'Show'} checks <ChevronDown size={14} className={expanded?'rotate-180':''}/></button></div>
+      <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold">Why {signal?.decision??"signal"}? {signal ? `(LONG ${signal.longScore}/100 · SHORT ${signal.shortScore}/100)` : ""}</p><button type="button" className="flex items-center gap-1 text-xs text-teal-200" aria-expanded={expanded} onClick={()=>setExpanded(x=>!x)}>{expanded?'Hide':'Show'} checks <ChevronDown size={14} className={expanded?'rotate-180':''}/></button></div>
       {expanded&&<div className="mt-3 space-y-2">{checked.length?checked.map(check=><div className="flex items-start gap-2" key={check.id}>{check.passed?<CheckCircle2 size={15} className="mt-0.5 shrink-0 text-teal-300"/>:<XCircle size={15} className="mt-0.5 shrink-0 text-amber-300"/>}<div><p className="text-xs font-medium">{check.label}: {check.passed?'PASS':'FAIL'}</p><p className="muted text-xs">{check.detail}</p></div></div>):<p className="muted text-xs">Waiting for indicator checks.</p>}</div>}
       {failed.length>0&&<p className="mt-3 text-xs text-amber-200">Missing confirmations ({failed.length}): {failed.map(x=>x.label).join(', ')}. The next closed candle must satisfy all mandatory checks; a score alone is insufficient.</p>}
       {signal?.decision==="WAIT"&&signal?.vetoes.length>0&&<p className="muted mt-2 text-xs">Mandatory vetoes: {signal.vetoes.join(' · ')}</p>}

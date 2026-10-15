@@ -54,7 +54,14 @@ export function qualitySignal(input:{candles:Candle[];higher:Profile;btc:Profile
   ];
   return {score,parts,vetoes,ema,checks};
  }
- const long=calc('LONG'),short=calc('SHORT');const isLong=long.score>=short.score;const best=isLong?long:short;
+ // Select the most actionable directional candidate, not simply the highest raw score.
+ // A passing candidate outranks one with mandatory vetoes. When neither is valid,
+ // fewer vetoes and more passed checks provide clearer diagnostics, not a trade.
+ const long=calc('LONG'),short=calc('SHORT');
+ const rank=(x:ReturnType<typeof calc>)=>({valid:x.score>=75&&x.vetoes.length===0, vetoes:x.vetoes.length, passed:x.checks.filter(c=>c.passed).length});
+ const l=rank(long),s=rank(short);
+ const isLong=l.valid!==s.valid?l.valid:l.vetoes!==s.vetoes?l.vetoes<s.vetoes:l.passed!==s.passed?l.passed>s.passed:long.score>=short.score;
+ const best=isLong?long:short;
  const side:Side=isLong?'LONG':'SHORT';const decision=best.score>=75&&best.vetoes.length===0?side:'WAIT';
  const distance=i.atr*atrMult;
  return {candidateSide:side,checks:best.checks,shortChecks:short.checks,decision,score:best.score,longScore:long.score,shortScore:short.score,parts:best.parts,vetoes:best.vetoes,
@@ -63,139 +70,15 @@ export function qualitySignal(input:{candles:Candle[];higher:Profile;btc:Profile
  target:decision==='WAIT'?null:side==='LONG'?close+rr*distance:close-rr*distance,
  support:ms.support,resistance:ms.resistance,marketStructure:ms.description,isResearchOnly:true};
 }
-
-export async function futuresSnapshot(
-  symbol: SymbolId
-): Promise<Snapshot> {
-  const BASE = "https://www.okx.com";
-
-  const symbols: Record<SymbolId, string> = {
-    BTCUSDT: "BTC-USDT-SWAP",
-    ETHUSDT: "ETH-USDT-SWAP",
-    SOLUSDT: "SOL-USDT-SWAP",
-  };
-
-  const instId = symbols[symbol];
-  const warnings: string[] = [];
-
-  async function get<T>(
-    path: string,
-    label: string
-  ): Promise<T | null> {
-    try {
-      const response = await fetch(BASE + path, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(6500),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = (await response.json()) as {
-        code: string;
-        msg?: string;
-        data?: T[];
-      };
-
-      if (json.code !== "0" || !Array.isArray(json.data)) {
-        throw new Error(json.msg || "Invalid OKX response");
-      }
-
-      return json.data[0] ?? null;
-    } catch (error) {
-      warnings.push(
-        `${label} unavailable: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      return null;
-    }
-  }
-
-  type FundingData = {
-    fundingRate?: string;
-  };
-
-  type OpenInterestData = {
-    oi?: string;
-  };
-
-  type OrderBookData = {
-    bids?: string[][];
-    asks?: string[][];
-  };
-
-  const [funding, openInterest, orderBook] =
-    await Promise.all([
-      get<FundingData>(
-        `/api/v5/public/funding-rate?instId=${instId}`,
-        "Funding rate"
-      ),
-      get<OpenInterestData>(
-        `/api/v5/public/open-interest?instType=SWAP&instId=${instId}`,
-        "Open interest"
-      ),
-      get<OrderBookData>(
-        `/api/v5/market/books?instId=${instId}&sz=20`,
-        "Order book"
-      ),
-    ]);
-
-  const fundingRate =
-    funding?.fundingRate != null &&
-    Number.isFinite(Number(funding.fundingRate))
-      ? Number(funding.fundingRate)
-      : null;
-
-  // OKX 'oi' is expressed in contracts, not necessarily
-  // the same units as Binance openInterest.
-  const oi =
-    openInterest?.oi != null &&
-    Number.isFinite(Number(openInterest.oi))
-      ? Number(openInterest.oi)
-      : null;
-
-  const bids = orderBook?.bids ?? [];
-  const asks = orderBook?.asks ?? [];
-
-  const bestBid = Number(bids[0]?.[0]);
-  const bestAsk = Number(asks[0]?.[0]);
-
-  const bidVolume = bids.reduce(
-    (sum, row) => sum + Number(row[1] || 0),
-    0
-  );
-
-  const askVolume = asks.reduce(
-    (sum, row) => sum + Number(row[1] || 0),
-    0
-  );
-
-  const bidAskSpreadPct =
-    Number.isFinite(bestBid) &&
-    Number.isFinite(bestAsk) &&
-    bestBid > 0 &&
-    bestAsk >= bestBid
-      ? ((bestAsk - bestBid) /
-          ((bestBid + bestAsk) / 2)) *
-        100
-      : null;
-
-  const orderBookImbalance =
-    Number.isFinite(bidVolume) &&
-    Number.isFinite(askVolume) &&
-    bidVolume + askVolume > 0
-      ? (bidVolume - askVolume) /
-        (bidVolume + askVolume)
-      : null;
-
-  return {
-    fundingRate,
-    openInterest: oi,
-    bidAskSpreadPct,
-    orderBookImbalance,
-    warnings,
-  };
+export async function futuresSnapshot(symbol:SymbolId):Promise<Snapshot>{
+ const url='https://fapi.binance.com';const warnings:string[]=[];
+ async function get(path:string){try{const r=await fetch(url+path,{cache:'no-store',signal:AbortSignal.timeout(6500)});if(!r.ok)throw Error(String(r.status));return await r.json() as any;}catch{warnings.push(`Unavailable: ${path.split('?')[0]}`);return null;}}
+ const [premium,oi,depth]=await Promise.all([get(`/fapi/v1/premiumIndex?symbol=${symbol}`),get(`/fapi/v1/openInterest?symbol=${symbol}`),get(`/fapi/v1/depth?symbol=${symbol}&limit=20`)]);
+ const bid=Number(depth?.bids?.[0]?.[0]),ask=Number(depth?.asks?.[0]?.[0]);
+ const bv=Array.isArray(depth?.bids)?depth.bids.reduce((s:number,x:string[])=>s+Number(x[1]),0):NaN;
+ const av=Array.isArray(depth?.asks)?depth.asks.reduce((s:number,x:string[])=>s+Number(x[1]),0):NaN;
+ return {fundingRate:premium?.lastFundingRate!=null&&Number.isFinite(Number(premium.lastFundingRate))?Number(premium.lastFundingRate):null,
+  openInterest:oi?.openInterest!=null&&Number.isFinite(Number(oi.openInterest))?Number(oi.openInterest):null,
+  bidAskSpreadPct:bid>0&&ask>0?(ask-bid)/((bid+ask)/2)*100:null,
+  orderBookImbalance:Number.isFinite(bv+av)&&bv+av>0?(bv-av)/(bv+av):null,warnings};
 }
-
