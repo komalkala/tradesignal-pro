@@ -8,10 +8,9 @@ import path from 'node:path';
 import { getCandles } from '../src/lib/binance';
 import { profile, qualitySignal } from '../src/lib/pro';
 import { evaluateQuickSignal, QUICK_MIN_SCORE } from '../src/lib/quick-signal';
-import { riskContext, utcDay } from '../src/lib/event-risk';
 import { sendTelegramMessage } from '../src/lib/alerts/telegram';
 import {
-  WATCH_INTERVALS, WATCH_SYMBOLS, ADDITIONAL_SYMBOLS, alertKey, closeMs, formatSignalAlert,
+  WATCH_SYMBOLS, ADDITIONAL_SYMBOLS, alertKey, closeMs, formatSignalAlert,
   freshestComplete, higherInterval, isConfirmed, isFresh, INTERVAL_MS,
 } from '../src/lib/alerts/logic';
 import type { Candle, Interval, SymbolId } from '../src/lib/types';
@@ -22,8 +21,13 @@ type State = { version: 1; lastEvaluated: Record<string, number>; sent: Record<s
 const emptyState = (): State => ({ version: 1, lastEvaluated: {}, sent: {} });
 const dryRun = process.env.ALERT_DRY_RUN === 'true';
 const sendOnStart = process.env.ALERT_SEND_ON_START === 'true';
-const quickEnabled = process.env.ALERT_QUICK_ENABLED !== 'false';
-const eventEnabled = process.env.ALERT_EVENT_ENABLED === 'true';
+const quickEnabled = process.env.ALERT_QUICK_ENABLED === 'true';
+// Legacy economic-event reminders removed. V7_EVENTS_JSON + V7 worker are the single source.
+// Default to 1h/4h swing monitoring; 15m/1d remain opt-in.
+const WATCH_INTERVALS: readonly Interval[] = (process.env.ALERT_WATCH_INTERVALS ?? '1h,4h')
+  .split(',').map(x => x.trim()).filter((x): x is Interval =>
+    ['15m','1h','4h','1d'].includes(x));
+if (!WATCH_INTERVALS.length) throw Error('ALERT_WATCH_INTERVALS must include 15m, 1h, 4h or 1d');
 const pollRaw = Number(process.env.ALERT_POLL_MS ?? '60000');
 const pollMs = Number.isFinite(pollRaw) ? Math.max(30_000, pollRaw) : 60_000;
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -156,17 +160,6 @@ async function analyzeQuick(symbol: SymbolId, now: number) {
   pruneSent();
   await persist();
 }
-async function scanEvents(now: number) {
-  if (!eventEnabled) return;
-  const { upcoming } = riskContext(now);
-  for (const event of upcoming.filter(e => e.daysUntil === 0 || e.daysUntil === 1)) {
-    const id = `EVENT:${event.id}:${event.daysUntil}:${utcDay(now)}`;
-    if (state.sent[id]) continue;
-    const message = `📅 TRADE EVENT REMINDER\n${event.title}\nDate UTC: ${event.dateUTC}\n${event.source}\nNo directional forecast.`;
-    await dispatch(id, message, 'EVENT');
-    await persist();
-  }
-}
 async function scan() {
   if (running || stopping) return;
   running = true;
@@ -188,7 +181,6 @@ async function scan() {
         catch (e) { log(`${symbol} ${interval} ERROR: ${errorText(e)}`); }
       }
     }
-    try { await scanEvents(Date.now()); } catch (e) { log(`EVENT ERROR: ${errorText(e)}`); }
   } finally {
     currentFetchCache.clear();
     running = false;

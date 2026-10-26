@@ -11,7 +11,11 @@
     "alerts:monitor": "node --env-file=.env.local --import tsx workers/signal-monitor.ts",
     "alerts:test": "node --env-file=.env.local --import tsx workers/signal-monitor.ts --test",
     "sentiment:monitor": "node --env-file=.env.local --import tsx workers/sentiment-monitor.ts",
-    "v7:monitor": "node --env-file=.env.local --import tsx workers/v7-monitor.ts"
+    "v7:monitor": "node --env-file=.env.local --import tsx workers/v7-monitor.ts",
+    "v71:journal": "node --env-file=.env.local --import tsx workers/v71-journal-monitor.ts",
+    "dev:all": "node scripts/dev-all.mjs",
+    "dev:all:check": "node scripts/dev-all.mjs --check",
+    "order-flow:monitor": "node --env-file=.env.local --import tsx workers/order-flow-monitor.ts"
   },
   "dependencies": {
     "next": "^15.5.0",

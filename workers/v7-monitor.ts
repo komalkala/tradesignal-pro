@@ -6,6 +6,7 @@ import {loadHistoricalCandles} from '../src/lib/history';
 import {v7Decision} from '../src/lib/v7-decision';
 import {parseEvents} from '../src/lib/v7-events';
 import {sendTelegramMessage} from '../src/lib/alerts/telegram';
+import {PaperJournalStore} from './journal-store';
 const truth=(v:string|undefined)=>v==='true';
 const dryRun=!truth(process.env.V7_TELEGRAM_ENABLED)||truth(process.env.ALERT_DRY_RUN);
 const poll=Math.max(60000,Number(process.env.V7_POLL_MS||300000));
@@ -14,6 +15,8 @@ const bot=process.env.TELEGRAM_BOT_TOKEN||'';const chat=process.env.TELEGRAM_CHA
 const useForming=truth(process.env.V7_SETUP_FORMING_ALERTS);
 const activeCoins=SYMBOLS.filter(x=>!process.env.V7_SYMBOLS||process.env.V7_SYMBOLS.split(',').map(s=>s.trim()).includes(x));
 let state:Record<string,number>={};
+const journalEnabled=process.env.V71_JOURNAL_ENABLED!=='false';
+let journal:PaperJournalStore|null=null;
 async function notify(key:string,body:string,epoch:number){
  if(state[key])return;
  if(dryRun){console.log('[V7 DRY RUN]',key,'\n',body);return;}
@@ -35,6 +38,8 @@ async function check(){
   try{
    const [h,f,d]=await Promise.all([loadHistoricalCandles(symbol,'1h',500),loadHistoricalCandles(symbol,'4h',500),loadHistoricalCandles(symbol,'1d',500)]);
    const result=v7Decision(symbol as SymbolId,h,f,d,now);
+   // Reuse these same candle arrays to avoid a separate 18+ API-request journal scan.
+   if(journal)try{await journal.update(symbol,result,h,now)}catch(error){console.error('[JOURNAL ERROR]',symbol,error instanceof Error?error.message:String(error));}
    if(result.isFresh&&(result.status.startsWith('CONFIRMED')||(useForming&&result.status==='SETUP_FORMING'))){
     const key=`swing:${symbol}:${result.signalTime}:${result.status}`;
     await notify(key,`📊 V7 SWING PAPER RESEARCH\n${symbol} — ${result.status.replaceAll('_',' ')}\nConfirmed 1H close: ${whenIST(result.signalTime)}\nDaily bias: ${result.bias}; 4H trend: ${result.trend}\nReference: ${result.entry??'Pending'}; Stop: ${result.stop??'Pending'}; Target: ${result.target??'Pending'}\nResearch only, NOT an order or validated live recommendation. News risk never blocks entries.`,now);
@@ -46,7 +51,8 @@ async function check(){
  for(const [key,time] of Object.entries(state)){if(now-time>90*86400000)delete state[key]}
 }
 async function main(){try{state=JSON.parse(await readFile(statePath,'utf8'))}catch{state={}}
- console.log('[V7] started',`dryRun=${dryRun}`,`poll=${poll}`,`coins=${activeCoins.join(',')}`);
+ if(journalEnabled)journal=await PaperJournalStore.open();
+ console.log('[V7] started',`dryRun=${dryRun}`,`poll=${poll}`,`coins=${activeCoins.join(',')}`,`journal=${journalEnabled}`);
  // Default startup baseline: no catch-up trades from older candles.
  if(!Object.keys(state).length){
   for(const symbol of activeCoins){try{const [h,f,d]=await Promise.all([loadHistoricalCandles(symbol,'1h',500),loadHistoricalCandles(symbol,'4h',500),loadHistoricalCandles(symbol,'1d',500)]);const r=v7Decision(symbol,h,f,d);state[`swing:${symbol}:${r.signalTime}:${r.status}`]=Date.now()}catch{}}

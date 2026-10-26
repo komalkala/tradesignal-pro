@@ -8,7 +8,7 @@ export function parseEvents(input:string|undefined):EconomicEvent[]{
  return raw.filter((e):e is EconomicEvent=>{
   if(!e||typeof e!=='object')return false;
   const x=e as Record<string,unknown>;
-  return typeof x.id==='string'&&x.id.length>0&&typeof x.name==='string'&&x.name.length>0&&typeof x.timeUTC==='string'&&Number.isFinite(Date.parse(x.timeUTC))&&['CRITICAL','HIGH','MEDIUM'].includes(String(x.impact))&&typeof x.source==='string'&&/^https:\/\//.test(x.source);
+  return typeof x.id==='string'&&x.id.length>0&&typeof x.name==='string'&&x.name.length>0&&typeof x.timeUTC==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(x.timeUTC)&&Number.isFinite(Date.parse(x.timeUTC))&&['CRITICAL','HIGH','MEDIUM'].includes(String(x.impact))&&typeof x.source==='string'&&/^https:\/\//.test(x.source);
  }).sort((a,b)=>Date.parse(a.timeUTC)-Date.parse(b.timeUTC));
 }
 export function eventRisk(events:EconomicEvent[],now=Date.now()):NewsRisk{
